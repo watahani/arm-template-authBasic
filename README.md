@@ -26,6 +26,12 @@ Dns Prefix : Public IP Address に対する DNS 名。DNSPrefix-VMName.<reagion>
 
 ## next step
 
-以下のテンプレートを同じリージョンに Deploy しよう
+以下のテンプレートを同じリージョンに Deploy しよう。証明書の取得がとっても簡単。
 
 https://github.com/shibayan/keyvault-acmebot/blob/master/README_ja.md
+
+## next
+
+以下のリンクを参照に、AD FS / Wap サーバーなどに証明書を割り当ててしまいましょう！
+
+[./sample-keyvault-certattach.md](./sample-keyvault-certattach.md)

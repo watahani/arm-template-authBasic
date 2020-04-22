@@ -24,3 +24,8 @@ Dns Prefix : Public IP Address に対する DNS 名。DNSPrefix-VMName.<reagion>
 
 ![](./armViewer.png)
 
+## next step
+
+以下のテンプレートを同じリージョンに Deploy しよう
+
+https://github.com/shibayan/keyvault-acmebot/blob/master/README_ja.md

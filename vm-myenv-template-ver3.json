@@ -11,10 +11,11 @@
         },
         "virtualMachineNamePrefix": {
             "type": "string",
-            "defaultValue": "less than 9 char",
+            "defaultValue": "less than 10 char",
             "metadata": {
                 "description": "マシン名の制限より9文字以下の小文字を入力。マシン名の制限に引っかかるとデプロイエラー."
-            }
+            },
+            "maxLength": 9
         },
         "osDiskType": {
             "type": "string",

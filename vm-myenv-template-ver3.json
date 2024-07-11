@@ -2,39 +2,74 @@
     "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
     "contentVersion": "1.0.0.0",
     "parameters": {
-        "location": {
-            "type": "string",
-            "defaultValue": "japaneast",
-            "metadata": {
-                "description": "Location for all resources."
-            }
-        },
         "virtualMachineNamePrefix": {
             "type": "string",
             "defaultValue": "less than 9 char",
             "metadata": {
                 "description": "マシン名の制限より9文字以下の小文字を入力。マシン名の制限に引っかかるとデプロイエラー."
-            }
-        },
-        "osDiskType": {
-            "type": "string",
-            "defaultValue": "StandardSSD_LRS",
-            "allowedValues" : [
-                "StandardSSD_LRS",
-                "Standard_LRS"
-            ]
+            },
+            "maxLength": 9
         },
         "virtualMachineSize": {
             "type": "string",
-            "defaultValue": "Standard_B4ms"
+            "defaultValue": "Standard_B2s"
         },
         "adminUsername": {
             "type": "string"
         },
+        "osDiskType": {
+            "type": "string",
+            "defaultValue": "StandardSSD_LRS",
+            "allowedValues": [
+                "StandardSSD_LRS",
+                "Standard_LRS"
+            ]
+        },
+        "windowsVMs": {
+            "type": "array",
+            "metadata": {
+                "description": "List of VM. eg: [{\"'Name\": \"hoge\", \"PrivateIP\": \"10.0.0.1\"}]"
+            },
+            "defaultValue": [
+                "{\"PrivateIP\":\"10.0.1.13\",\"Name\":\"aadc\",\"imageReference\":{\"publisher\":\"MicrosoftWindowsServer\",\"offer\":\"WindowsServer\",\"sku\":\"2022-datacenter-g2\",\"version\":\"latest\"}}",
+                "{\"PrivateIP\":\"10.0.1.7\",\"Name\":\"adcs\"}",
+                "{\"PrivateIP\":\"10.0.1.14\",\"Name\":\"adfs\"}",
+                "{\"PrivateIP\":\"10.0.1.19\",\"Name\":\"adfs2019\"}",
+                "{\"PrivateIP\":\"10.0.1.4\",\"Name\":\"client02\"}",
+                "{\"PrivateIP\":\"10.0.1.10\",\"Name\":\"dc\"}",
+                "{\"PrivateIP\":\"10.0.1.6\",\"Name\":\"w10-c01\",\"imageReference\":{\"offer\":\"Windows-10\",\"publisher\":\"MicrosoftWindowsDesktop\",\"sku\":\"win10-22h2-pron-g2\",\"version\":\"19045.4170.240307\"}}",
+                "{\"PrivateIP\":\"10.0.1.15\",\"Name\":\"wap\"}",
+                "{\"PrivateIP\":\"10.0.1.16\",\"Name\":\"web\"}"
+            ]
+        },
         "adminPassword": {
             "type": "secureString"
         },
-        "dnsPrefix" : {
+        "addressPrefixes": {
+            "type": "array",
+            "defaultValue": [ "10.0.0.0/16" ],
+            "metadata": {
+                "description": "VNet のアドレス空間"
+            }
+        },
+        "defaultSubnet": {
+            "type": "string",
+            "defaultValue": "10.0.0.1/24",
+            "metadata": {
+                "description": "VNet のデフォルトサブネットのアドレス空間"
+            }
+        },
+        "dnsServers": {
+            "type": "array",
+            "defaultValue": [
+                "10.0.1.10",
+                "1.1.1.1"
+            ],
+            "metadata": {
+                "description": "DNS サーバーのアドレス。AD DC サーバーの IP を指定する。"
+            }
+        },
+        "dnsPrefix": {
             "type": "string",
             "defaultValue": "yourAlias",
             "metadata": {
@@ -43,41 +78,52 @@
         }
     },
     "variables": {
-        "networkSecurityGroupName" : "[concat(resourceGroup().name,'-nsg')]",
+        "networkSecurityGroupName": "[concat(resourceGroup().name,'-nsg')]",
         "nsgId": "[resourceId(resourceGroup().name, 'Microsoft.Network/networkSecurityGroups', variables('networkSecurityGroupName'))]",
-        "virtualNetworkName" : "[concat(resourceGroup().name,'-vnet')]",
+        "virtualNetworkName": "[concat(resourceGroup().name,'-vnet')]",
         "vnetId": "[resourceId('Microsoft.Network/virtualNetworks', variables('virtualNetworkName'))]",
         "subnetRef": "[concat(variables('vnetId'), '/subnets/', 'default')]",
-        "ADDSName" : "[concat(parameters('virtualMachineNamePrefix'),'-dc')]",
-        "networkInterfaceName-ds" : "[concat(parameters('virtualMachineNamePrefix'),'-addsnic')]",
-        "publicIpAddressName-ds" : "[concat(parameters('virtualMachineNamePrefix'),'-addsip')]",
-        "publicIpAddressSku" : "Basic",
-        "diagnosticsStorageAccountName" : "[concat(parameters('virtualMachineNamePrefix'),'diag')]",
-        "ADDCName" : "[concat(parameters('virtualMachineNamePrefix'),'-aadc')]",
-        "networkInterfaceName-addc" : "[concat(parameters('virtualMachineNamePrefix'),'-addcnic')]",
-        "publicIpAddressName-addc" : "[concat(parameters('virtualMachineNamePrefix'),'-addcip')]",
-        "ADFSName" : "[concat(parameters('virtualMachineNamePrefix'),'-adfs')]",
-        "networkInterfaceName-adfs" : "[concat(parameters('virtualMachineNamePrefix'),'-adfsnic')]",
-        "publicIpAddressName-adfs" : "[concat(parameters('virtualMachineNamePrefix'),'-adfsip')]",
-        "WAPName" : "[concat(parameters('virtualMachineNamePrefix'),'-wap')]",
-        "networkInterfaceName-wap" : "[concat(parameters('virtualMachineNamePrefix'),'-wapnic')]",
-        "publicIpAddressName-wap" : "[concat(parameters('virtualMachineNamePrefix'),'-wapip')]",
-        "WebServerName" : "[concat(parameters('virtualMachineNamePrefix'),'-web')]",
-        "networkInterfaceName-web" : "[concat(parameters('virtualMachineNamePrefix'),'-webnic')]",
-        "publicIpAddressName-web" : "[concat(parameters('virtualMachineNamePrefix'),'-webip')]",
-        "appProxyName" : "[concat(parameters('virtualMachineNamePrefix'),'-proxy')]",
-        "networkInterfaceName-appProxy" : "[concat(parameters('virtualMachineNamePrefix'),'-appProxynic')]",
-        "publicIpAddressName-appProxy" : "[concat(parameters('virtualMachineNamePrefix'),'-appProxyp')]"
+        "publicIpAddressSku": "Basic",
+        "diagnosticsStorageAccountName": "[concat(parameters('virtualMachineNamePrefix'),'diag', uniqueString(resourceGroup().id))]",
+        "defaultImageReference": {
+            "publisher": "MicrosoftWindowsServer",
+            "offer": "WindowsServer",
+            "sku": "2022-datacenter-g2",
+            "version": "latest"
+        }
     },
     "resources": [
         {
-            "name": "[variables('networkInterfaceName-ds')]",
+            "type": "Microsoft.Network/publicIPAddresses",
+            "apiVersion": "2023-11-01",
+            "name": "[concat(parameters('virtualMachineNamePrefix'), '-', parameters('windowsVMs')[copyIndex()].Name, '-pubip')]",
+            "location": "[resourceGroup().location]",
+            "copy": {
+                "name": "publicIPCopy",
+                "count": "[length(parameters('windowsVMs'))]"
+            },
+            "properties": {
+                "publicIPAllocationMethod": "Dynamic",
+                "dnsSettings": {
+                    "domainNameLabel": "[concat(parameters('dnsprefix'),'-',parameters('windowsVMs')[copyIndex()].Name)]"
+                }
+            },
+            "sku": {
+                "name": "[variables('publicIpAddressSku')]"
+            }
+        },
+        {
+            "name": "[concat(parameters('virtualMachineNamePrefix'), '-', parameters('windowsVMs')[copyIndex()].Name, '-nic')]",
+            "copy": {
+                "name": "nicscopy",
+                "count": "[length(parameters('windowsVMs'))]"
+            },
             "type": "Microsoft.Network/networkInterfaces",
-            "apiVersion": "2019-07-01",
-            "location": "[parameters('location')]",
+            "apiVersion": "2023-11-01",
+            "location": "[resourceGroup().location]",
             "dependsOn": [
-                "[concat('Microsoft.Network/virtualNetworks/', variables('virtualNetworkName'))]",
-                "[concat('Microsoft.Network/publicIpAddresses/', variables('publicIpAddressName-ds'))]"
+                "[concat('Microsoft.Network/publicIPAddresses/', parameters('virtualMachineNamePrefix'), '-', parameters('windowsVMs')[copyIndex()].Name, '-pubip')]",
+                "[concat('Microsoft.Storage/storageAccounts/', variables('diagnosticsStorageAccountName'))]"
             ],
             "properties": {
                 "ipConfigurations": [
@@ -88,9 +134,9 @@
                                 "id": "[variables('subnetRef')]"
                             },
                             "privateIPAllocationMethod": "Static",
-                            "privateIPAddress": "10.0.1.10",
+                            "privateIPAddress": "[parameters('windowsVMs')[copyIndex()].PrivateIP]",
                             "publicIpAddress": {
-                                "id": "[resourceId('Microsoft.Network/publicIpAddresses', variables('publicIpAddressName-ds'))]"
+                                "id": "[resourceId('Microsoft.Network/publicIPAddresses', concat(parameters('virtualMachineNamePrefix'), '-', parameters('windowsVMs')[copyIndex()].Name, '-pubip'))]"
                             }
                         }
                     }
@@ -100,8 +146,8 @@
         {
             "name": "[variables('networkSecurityGroupName')]",
             "type": "Microsoft.Network/networkSecurityGroups",
-            "apiVersion": "2019-02-01",
-            "location": "[parameters('location')]"
+            "apiVersion": "2023-11-01",
+            "location": "[resourceGroup().location]"
         },
         {
             "name": "[variables('virtualNetworkName')]",
@@ -109,20 +155,21 @@
             "dependsOn": [
                 "[resourceId('Microsoft.Network/networkSecurityGroups', variables('networkSecurityGroupName'))]"
             ],
-            "apiVersion": "2019-09-01",
-            "location": "[parameters('location')]",
+            "apiVersion": "2023-11-01",
+            "location": "[resourceGroup().location]",
             "properties": {
                 "addressSpace": {
-                    "addressPrefixes": [
-                        "10.0.0.0/16"
-                    ]
+                    "addressPrefixes": "[parameters('addressPrefixes')]"
+                },
+                "dhcpOptions": {
+                    "dnsServers": "[parameters('dnsServers')]"
                 },
                 "subnets": [
                     {
-                        "name" : "default",
-                        "properties" : {
-                            "addressPrefix" : "10.0.1.0/24",
-                            "networkSecurityGroup" : {
+                        "name": "default",
+                        "properties": {
+                            "addressPrefix": "[parameters('defaultSubnet')]",
+                            "networkSecurityGroup": {
                                 "id": "[variables('nsgId')]"
                             }
                         }
@@ -131,76 +178,10 @@
             }
         },
         {
-            "name": "[variables('publicIpAddressName-ds')]",
-            "type": "Microsoft.Network/publicIpAddresses",
-            "apiVersion": "2019-02-01",
-            "location": "[parameters('location')]",
-            "properties": {
-                "publicIpAllocationMethod": "Dynamic",
-                "dnsSettings": {
-                    "domainNameLabel": "[concat(parameters('dnsprefix'),'-',variables('ADDSName'))]"
-                }
-            },
-            "sku": {
-                "name": "[variables('publicIpAddressSku')]"
-            }
-        },
-        {
-            "name": "[variables('ADDSName')]",
-            "type": "Microsoft.Compute/virtualMachines",
-            "apiVersion": "2019-07-01",
-            "location": "[parameters('location')]",
-            "dependsOn": [
-                "[concat('Microsoft.Network/networkInterfaces/', variables('networkInterfaceName-ds'))]",
-                "[concat('Microsoft.Storage/storageAccounts/', variables('diagnosticsStorageAccountName'))]"
-            ],
-            "properties": {
-                "hardwareProfile": {
-                    "vmSize": "[parameters('virtualMachineSize')]"
-                },
-                "storageProfile": {
-                    "osDisk": {
-                        "createOption": "fromImage",
-                        "managedDisk": {
-                            "storageAccountType": "[parameters('osDiskType')]"
-                        }
-                    },
-                    "imageReference": {
-                        "publisher": "MicrosoftWindowsServer",
-                        "offer": "WindowsServer",
-                        "sku": "2016-Datacenter",
-                        "version": "latest"
-                    }
-                },
-                "networkProfile": {
-                    "networkInterfaces": [
-                        {
-                            "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('networkInterfaceName-ds'))]"
-                        }
-                    ]
-                },
-                "osProfile": {
-                    "computerName": "[variables('ADDSName')]",
-                    "adminUsername": "[parameters('adminUsername')]",
-                    "adminPassword": "[parameters('adminPassword')]",
-                    "windowsConfiguration": {
-                        "enableAutomaticUpdates": true,
-                        "provisionVmAgent": true
-                    }
-                },
-                "diagnosticsProfile": {
-                    "bootDiagnostics": {
-                        "enabled": true,
-                        "storageUri": "[concat('https://', variables('diagnosticsStorageAccountName'), '.blob.core.windows.net/')]"
-                    }
-                }
-            }
-        },
-        {
             "name": "[variables('diagnosticsStorageAccountName')]",
             "type": "Microsoft.Storage/storageAccounts",
-            "apiVersion": "2019-06-01",
-            "location": "[parameters('location')]",
+            "apiVersion": "2023-01-01",
+            "location": "[resourceGroup().location]",
             "properties": {},
             "kind": "Storage",
             "sku": {
@@ -208,59 +189,27 @@
             }
         },
         {
-            "name": "[variables('publicIpAddressName-addc')]",
-            "type": "Microsoft.Network/publicIpAddresses",
-            "apiVersion": "2019-02-01",
-            "location": "[parameters('location')]",
-            "properties": {
-                "publicIpAllocationMethod": "Dynamic",
-                "dnsSettings": {
-                    "domainNameLabel": "[concat(parameters('dnsprefix'),'-',variables('ADDCName'))]"
-                }
-            },
-            "sku": {
-                "name": "[variables('publicIpAddressSku')]"
-            }
-        },
-        {
-            "name": "[variables('networkInterfaceName-addc')]",
-            "type": "Microsoft.Network/networkInterfaces",
-            "location": "[parameters('location')]",
-            "apiVersion": "2015-06-15",
-            "dependsOn": [
-                "[concat('Microsoft.Network/virtualNetworks/', variables('virtualNetworkName'))]",
-                "[concat('Microsoft.Network/publicIpAddresses/', variables('publicIpAddressName-addc'))]"
-            ],
-            "properties": {
-                "ipConfigurations": [
-                    {
-                        "name": "ipconfig1",
-                        "properties": {
-                            "privateIPAllocationMethod": "Static",
-                            "privateIPAddress": "10.0.1.13",
-                            "subnet": {
-                                "id": "[variables('subnetRef')]"
-                            },
-                            "publicIpAddress": {
-                                "id": "[resourceId('Microsoft.Network/publicIpAddresses', variables('publicIpAddressName-addc'))]"
-                            }
-                        }
-                    }
-                ]
-            }
-        },
-        {
-            "name": "[variables('ADDCName')]",
             "type": "Microsoft.Compute/virtualMachines",
-            "apiVersion": "2019-07-01",
-            "location": "[parameters('location')]",
+            "apiVersion": "2023-09-01",
+            "name": "[concat(parameters('virtualMachineNamePrefix'), '-', parameters('windowsVMs')[copyIndex()].Name)]",
+            "location": "[resourceGroup().location]",
+            "copy": {
+                "name": "vmsCopy",
+                "count": "[length(parameters('windowsVMs'))]"
+            },
             "dependsOn": [
-                "[concat('Microsoft.Network/networkInterfaces/', variables('networkInterfaceName-addc'))]",
-                "[concat('Microsoft.Storage/storageAccounts/', variables('diagnosticsStorageAccountName'))]"
+                "[concat('Microsoft.Network/networkInterfaces/', parameters('virtualMachineNamePrefix'), '-', parameters('windowsVMs')[copyIndex()].Name, '-nic')]"
             ],
             "properties": {
                 "hardwareProfile": {
                     "vmSize": "[parameters('virtualMachineSize')]"
+                },
+                "networkProfile": {
+                    "networkInterfaces": [
+                        {
+                            "id": "[resourceId('Microsoft.Network/networkInterfaces', concat(parameters('virtualMachineNamePrefix'), '-', parameters('windowsVMs')[copyIndex()].Name, '-nic'))]"
+                        }
+                    ]
                 },
                 "storageProfile": {
                     "osDisk": {
@@ -269,405 +218,21 @@
                             "storageAccountType": "[parameters('osDiskType')]"
                         }
                     },
-                    "imageReference": {
-                        "publisher": "MicrosoftWindowsServer",
-                        "offer": "WindowsServer",
-                        "sku": "2016-Datacenter",
-                        "version": "latest"
-                    }
-                },
-                "networkProfile": {
-                    "networkInterfaces": [
-                        {
-                            "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('networkInterfaceName-addc'))]"
-                        }
-                    ]
-                },
-                "osProfile": {
-                    "computerName": "[variables('ADDCName')]",
-                    "adminUsername": "[parameters('adminUsername')]",
-                    "adminPassword": "[parameters('adminPassword')]",
-                    "windowsConfiguration": {
-                        "enableAutomaticUpdates": true,
-                        "provisionVmAgent": true
-                    }
+                    "imageReference": "[if(equals(indexOf('imageReference', string(parameters('windowsVMs')[copyIndex()])), -1), variables('defaultImageReference'), parameters('windowsVMs')[copyIndex()].imageReference)]"
                 },
                 "diagnosticsProfile": {
                     "bootDiagnostics": {
                         "enabled": true,
                         "storageUri": "[concat('https://', variables('diagnosticsStorageAccountName'), '.blob.core.windows.net/')]"
                     }
-                }
-            }
-        },
-        {
-            "name": "[variables('publicIpAddressName-adfs')]",
-            "type": "Microsoft.Network/publicIpAddresses",
-            "apiVersion": "2019-02-01",
-            "location": "[parameters('location')]",
-            "properties": {
-                "publicIpAllocationMethod": "Dynamic",
-                "dnsSettings": {
-                    "domainNameLabel": "[concat(parameters('dnsprefix'),'-',variables('ADFSName'))]"
-                }
-            },
-            "sku": {
-                "name": "[variables('publicIpAddressSku')]"
-            }
-        },
-        {
-            "name": "[variables('networkInterfaceName-adfs')]",
-            "type": "Microsoft.Network/networkInterfaces",
-            "location": "[parameters('location')]",
-            "apiVersion": "2015-06-15",
-            "dependsOn": [
-                "[concat('Microsoft.Network/virtualNetworks/', variables('virtualNetworkName'))]",
-                "[concat('Microsoft.Network/publicIpAddresses/', variables('publicIpAddressName-adfs'))]"
-            ],
-            "properties": {
-                "ipConfigurations": [
-                    {
-                        "name": "ipconfig1",
-                        "properties": {
-                            "privateIPAllocationMethod": "Static",
-                            "privateIPAddress": "10.0.1.14",
-                            "subnet": {
-                                "id": "[variables('subnetRef')]"
-                            },
-                            "publicIpAddress": {
-                                "id": "[resourceId('Microsoft.Network/publicIpAddresses', variables('publicIpAddressName-adfs'))]"
-                            }
-                        }
-                    }
-                ]
-            }
-        },
-        {
-            "name": "[variables('ADFSName')]",
-            "type": "Microsoft.Compute/virtualMachines",
-            "apiVersion": "2019-07-01",
-            "location": "[parameters('location')]",
-            "dependsOn": [
-                "[concat('Microsoft.Network/networkInterfaces/', variables('networkInterfaceName-adfs'))]",
-                "[concat('Microsoft.Storage/storageAccounts/', variables('diagnosticsStorageAccountName'))]"
-            ],
-            "properties": {
-                "hardwareProfile": {
-                    "vmSize": "[parameters('virtualMachineSize')]"
-                },
-                "storageProfile": {
-                    "osDisk": {
-                        "createOption": "fromImage",
-                        "managedDisk": {
-                            "storageAccountType": "[parameters('osDiskType')]"
-                        }
-                    },
-                    "imageReference": {
-                        "publisher": "MicrosoftWindowsServer",
-                        "offer": "WindowsServer",
-                        "sku": "2016-Datacenter",
-                        "version": "latest"
-                    }
-                },
-                "networkProfile": {
-                    "networkInterfaces": [
-                        {
-                            "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('networkInterfaceName-adfs'))]"
-                        }
-                    ]
                 },
                 "osProfile": {
-                    "computerName": "[variables('ADFSName')]",
+                    "computerName": "[concat(parameters('virtualMachineNamePrefix'), '-', parameters('windowsVMs')[copyIndex()].Name)]",
                     "adminUsername": "[parameters('adminUsername')]",
                     "adminPassword": "[parameters('adminPassword')]",
                     "windowsConfiguration": {
                         "enableAutomaticUpdates": true,
                         "provisionVmAgent": true
-                    }
-                },
-                "diagnosticsProfile": {
-                    "bootDiagnostics": {
-                        "enabled": true,
-                        "storageUri": "[concat('https://', variables('diagnosticsStorageAccountName'), '.blob.core.windows.net/')]"
-                    }
-                }
-            }
-        },
-        {
-            "name": "[variables('publicIpAddressName-wap')]",
-            "type": "Microsoft.Network/publicIpAddresses",
-            "apiVersion": "2019-02-01",
-            "location": "[parameters('location')]",
-            "properties": {
-                "publicIpAllocationMethod": "Dynamic",
-                "dnsSettings": {
-                    "domainNameLabel": "[concat(parameters('dnsprefix'),'-',variables('WAPName'))]"
-                }
-            },
-            "sku": {
-                "name": "[variables('publicIpAddressSku')]"
-            }
-        },
-        {
-            "name": "[variables('networkInterfaceName-wap')]",
-            "type": "Microsoft.Network/networkInterfaces",
-            "location": "[parameters('location')]",
-            "apiVersion": "2015-06-15",
-            "dependsOn": [
-                "[concat('Microsoft.Network/virtualNetworks/', variables('virtualNetworkName'))]",
-                "[concat('Microsoft.Network/publicIpAddresses/', variables('publicIpAddressName-wap'))]"
-            ],
-            "properties": {
-                "ipConfigurations": [
-                    {
-                        "name": "ipconfig1",
-                        "properties": {
-                            "privateIPAllocationMethod": "Static",
-                            "privateIPAddress": "10.0.1.15",
-                            "subnet": {
-                                "id": "[variables('subnetRef')]"
-                            },
-                            "publicIpAddress": {
-                                "id": "[resourceId('Microsoft.Network/publicIpAddresses', variables('publicIpAddressName-wap'))]"
-                            }
-                        }
-                    }
-                ]
-            }
-        },
-        {
-            "name": "[variables('WAPName')]",
-            "type": "Microsoft.Compute/virtualMachines",
-            "apiVersion": "2019-07-01",
-            "location": "[parameters('location')]",
-            "dependsOn": [
-                "[concat('Microsoft.Network/networkInterfaces/', variables('networkInterfaceName-wap'))]",
-                "[concat('Microsoft.Storage/storageAccounts/', variables('diagnosticsStorageAccountName'))]"
-            ],
-            "properties": {
-                "hardwareProfile": {
-                    "vmSize": "[parameters('virtualMachineSize')]"
-                },
-                "storageProfile": {
-                    "osDisk": {
-                        "createOption": "fromImage",
-                        "managedDisk": {
-                            "storageAccountType": "[parameters('osDiskType')]"
-                        }
-                    },
-                    "imageReference": {
-                        "publisher": "MicrosoftWindowsServer",
-                        "offer": "WindowsServer",
-                        "sku": "2016-Datacenter",
-                        "version": "latest"
-                    }
-                },
-                "networkProfile": {
-                    "networkInterfaces": [
-                        {
-                            "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('networkInterfaceName-wap'))]"
-                        }
-                    ]
-                },
-                "osProfile": {
-                    "computerName": "[variables('WAPName')]",
-                    "adminUsername": "[parameters('adminUsername')]",
-                    "adminPassword": "[parameters('adminPassword')]",
-                    "windowsConfiguration": {
-                        "enableAutomaticUpdates": true,
-                        "provisionVmAgent": true
-                    }
-                },
-                "diagnosticsProfile": {
-                    "bootDiagnostics": {
-                        "enabled": true,
-                        "storageUri": "[concat('https://', variables('diagnosticsStorageAccountName'), '.blob.core.windows.net/')]"
-                    }
-                }
-            }
-        },
-        {
-            "name": "[variables('publicIpAddressName-web')]",
-            "type": "Microsoft.Network/publicIpAddresses",
-            "apiVersion": "2019-02-01",
-            "location": "[parameters('location')]",
-            "properties": {
-                "publicIpAllocationMethod": "Dynamic",
-                "dnsSettings": {
-                    "domainNameLabel": "[concat(parameters('dnsprefix'),'-',variables('WebServerName'))]"
-                }
-            },
-            "sku": {
-                "name": "[variables('publicIpAddressSku')]"
-            }
-        },
-        {
-            "name": "[variables('networkInterfaceName-web')]",
-            "type": "Microsoft.Network/networkInterfaces",
-            "location": "[parameters('location')]",
-            "apiVersion": "2015-06-15",
-            "dependsOn": [
-                "[concat('Microsoft.Network/virtualNetworks/', variables('virtualNetworkName'))]",
-                "[concat('Microsoft.Network/publicIpAddresses/', variables('publicIpAddressName-web'))]"
-            ],
-            "properties": {
-                "ipConfigurations": [
-                    {
-                        "name": "ipconfig1",
-                        "properties": {
-                            "privateIPAllocationMethod": "Static",
-                            "privateIPAddress": "10.0.1.16",
-                            "subnet": {
-                                "id": "[variables('subnetRef')]"
-                            },
-                            "publicIpAddress": {
-                                "id": "[resourceId('Microsoft.Network/publicIpAddresses', variables('publicIpAddressName-web'))]"
-                            }
-                        }
-                    }
-                ]
-            }
-        },
-        {
-            "name": "[variables('WebServerName')]",
-            "type": "Microsoft.Compute/virtualMachines",
-            "apiVersion": "2019-07-01",
-            "location": "[parameters('location')]",
-            "dependsOn": [
-                "[concat('Microsoft.Network/networkInterfaces/', variables('networkInterfaceName-web'))]",
-                "[concat('Microsoft.Storage/storageAccounts/', variables('diagnosticsStorageAccountName'))]"
-            ],
-            "properties": {
-                "hardwareProfile": {
-                    "vmSize": "[parameters('virtualMachineSize')]"
-                },
-                "storageProfile": {
-                    "osDisk": {
-                        "createOption": "fromImage",
-                        "managedDisk": {
-                            "storageAccountType": "[parameters('osDiskType')]"
-                        }
-                    },
-                    "imageReference": {
-                        "publisher": "MicrosoftWindowsServer",
-                        "offer": "WindowsServer",
-                        "sku": "2016-Datacenter",
-                        "version": "latest"
-                    }
-                },
-                "networkProfile": {
-                    "networkInterfaces": [
-                        {
-                            "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('networkInterfaceName-web'))]"
-                        }
-                    ]
-                },
-                "osProfile": {
-                    "computerName": "[variables('WebServerName')]",
-                    "adminUsername": "[parameters('adminUsername')]",
-                    "adminPassword": "[parameters('adminPassword')]",
-                    "windowsConfiguration": {
-                        "enableAutomaticUpdates": true,
-                        "provisionVmAgent": true
-                    }
-                },
-                "diagnosticsProfile": {
-                    "bootDiagnostics": {
-                        "enabled": true,
-                        "storageUri": "[concat('https://', variables('diagnosticsStorageAccountName'), '.blob.core.windows.net/')]"
-                    }
-                }
-            }
-        },
-        {
-            "name": "[variables('publicIpAddressName-appProxy')]",
-            "type": "Microsoft.Network/publicIpAddresses",
-            "apiVersion": "2019-02-01",
-            "location": "[parameters('location')]",
-            "properties": {
-                "publicIpAllocationMethod": "Dynamic",
-                "dnsSettings": {
-                    "domainNameLabel": "[concat(parameters('dnsprefix'),'-',variables('appProxyName'))]"
-                }
-            },
-            "sku": {
-                "name": "[variables('publicIpAddressSku')]"
-            }
-        },
-        {
-            "name": "[variables('networkInterfaceName-appProxy')]",
-            "type": "Microsoft.Network/networkInterfaces",
-            "location": "[parameters('location')]",
-            "apiVersion": "2015-06-15",
-            "dependsOn": [
-                "[concat('Microsoft.Network/virtualNetworks/', variables('virtualNetworkName'))]",
-                "[concat('Microsoft.Network/publicIpAddresses/', variables('publicIpAddressName-appProxy'))]"
-            ],
-            "properties": {
-                "ipConfigurations": [
-                    {
-                        "name": "ipconfig1",
-                        "properties": {
-                            "privateIPAllocationMethod": "Static",
-                            "privateIPAddress": "10.0.1.17",
-                            "subnet": {
-                                "id": "[variables('subnetRef')]"
-                            },
-                            "publicIpAddress": {
-                                "id": "[resourceId('Microsoft.Network/publicIpAddresses', variables('publicIpAddressName-appProxy'))]"
-                            }
-                        }
-                    }
-                ]
-            }
-        },
-        {
-            "name": "[variables('appProxyName')]",
-            "type": "Microsoft.Compute/virtualMachines",
-            "apiVersion": "2019-07-01",
-            "location": "[parameters('location')]",
-            "dependsOn": [
-                "[concat('Microsoft.Network/networkInterfaces/', variables('networkInterfaceName-appProxy'))]",
-                "[concat('Microsoft.Storage/storageAccounts/', variables('diagnosticsStorageAccountName'))]"
-            ],
-            "properties": {
-                "hardwareProfile": {
-                    "vmSize": "[parameters('virtualMachineSize')]"
-                },
-                "storageProfile": {
-                    "osDisk": {
-                        "createOption": "fromImage",
-                        "managedDisk": {
-                            "storageAccountType": "[parameters('osDiskType')]"
-                        }
-                    },
-                    "imageReference": {
-                        "publisher": "MicrosoftWindowsServer",
-                        "offer": "WindowsServer",
-                        "sku": "2016-Datacenter",
-                        "version": "latest"
-                    }
-                },
-                "networkProfile": {
-                    "networkInterfaces": [
-                        {
-                            "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('networkInterfaceName-appProxy'))]"
-                        }
-                    ]
-                },
-                "osProfile": {
-                    "computerName": "[variables('appProxyName')]",
-                    "adminUsername": "[parameters('adminUsername')]",
-                    "adminPassword": "[parameters('adminPassword')]",
-                    "windowsConfiguration": {
-                        "enableAutomaticUpdates": true,
-                        "provisionVmAgent": true
-                    }
-                },
-                "diagnosticsProfile": {
-                    "bootDiagnostics": {
-                        "enabled": true,
-                        "storageUri": "[concat('https://', variables('diagnosticsStorageAccountName'), '.blob.core.windows.net/')]"
                     }
                 }
             }

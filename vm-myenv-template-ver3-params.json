@@ -1,0 +1,82 @@
+﻿{
+  "contentVersion": "1.0.0.0",
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "parameters": {
+    "dnsPrefix": {
+      "value": "wahaniyanoprod"
+    },
+    "adminUsername": {
+      "value": "wahaniya"
+    },
+    "adminPassword": {
+      "value": "12wq!@WQ"
+   },
+    "virtualMachineNamePrefix": {
+      "value": "e5vm"
+    },
+    "addressPrefixes": {
+      "value": ["10.0.0.0/16"]
+    },
+    "defaultSubnet": {
+      "value": "10.0.1.0/24"
+    },
+    "dnsServers": {
+      "value": ["10.0.1.10", "1.1.1.1"]
+    },
+    "windowsVMs": {
+      "value": [
+        {
+          "PrivateIP": "10.0.1.13",
+          "Name": "aadc",
+          "imageReference": {
+            "publisher": "MicrosoftWindowsServer",
+            "offer": "WindowsServer",
+            "sku": "2022-datacenter-g2",
+            "version": "latest"
+          }
+        },
+        {
+          "PrivateIP": "10.0.1.7",
+          "Name": "adcs"
+        },
+        {
+          "PrivateIP": "10.0.1.14",
+          "Name": "adfs"
+        },
+        {
+          "PrivateIP": "10.0.1.19",
+          "Name": "adfs2019"
+        },
+        {
+          "PrivateIP": "10.0.1.4",
+          "Name": "client02"
+        },
+        {
+          "PrivateIP": "10.0.1.10",
+          "Name": "dc"
+        },
+        {
+          "PrivateIP": "10.0.1.6",
+          "Name": "w10-c01",
+          "imageReference": {
+            "offer": "Windows-10",
+            "publisher": "MicrosoftWindowsDesktop",
+            "sku": "win10-22h2-pron-g2",
+            "version": "19045.4170.240307"
+          }
+        },
+        {
+          "PrivateIP": "10.0.1.15",
+          "Name": "wap"
+        },
+        {
+          "PrivateIP": "10.0.1.16",
+          "Name": "web"
+        }
+      ]
+    },
+    "virtualMachineSize": {
+      "value": "Standard_B2als_v2"
+    }
+  }
+}
